@@ -1,5 +1,6 @@
 import React from 'react';
 import { useMindMapStore } from '../store/useMindMapStore';
+import CustomTitle from './CustomTitle';
 import {
   FiPlus as Plus,
   FiLink as LinkIcon,
@@ -38,7 +39,8 @@ const Toolbar: React.FC = () => {
   };
 
   return (
-    <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-2 flex gap-2">
+    <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-2 flex gap-2 flex-items-center">
+      <CustomTitle />
       <button
         onClick={() => addNode()}
         className="p-2 hover:bg-gray-100 rounded transition-colors"

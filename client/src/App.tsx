@@ -16,7 +16,7 @@ const App: React.FC = () => {
       <StatusBar />
       
       <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-xs">
-        <h2 className="text-lg font-bold mb-2">Mind-Map Collab</h2>
+        <h2 className="text-lg font-bold mb-2">Shortcuts</h2>
         <div className="text-sm text-gray-600 space-y-1">
           <p><kbd className="px-1 bg-gray-100 rounded">N</kbd> Add node</p>
           <p><kbd className="px-1 bg-gray-100 rounded">C</kbd> Connect mode</p>

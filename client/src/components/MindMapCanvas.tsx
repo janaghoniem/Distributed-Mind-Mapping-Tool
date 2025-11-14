@@ -89,7 +89,31 @@ const MindMapCanvas: React.FC = () => {
         >
           <polygon points="0 0, 10 3, 0 6" fill="#94A3B8" />
         </marker>
+
+        {/* --- ADDED GRID PATTERN DEFINITION --- */}
+        <pattern
+          id="smallGrid"
+          width="10"
+          height="10"
+          patternUnits="userSpaceOnUse"
+        >
+          <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#E5E7EB" strokeWidth="0.5" />
+        </pattern>
+        <pattern
+          id="grid"
+          width="100"
+          height="100"
+          patternUnits="userSpaceOnUse"
+        >
+          <rect width="100" height="100" fill="url(#smallGrid)" />
+          <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#D1D5DB" strokeWidth="1" />
+        </pattern>
+        {/* ------------------------------------- */}
       </defs>
+
+      {/* --- ADDED GRID RECTANGLE --- */}
+      <rect width="100%" height="100%" fill="url(#grid)" />
+      {/* ---------------------------- */}
 
       <g transform={`translate(${viewState.offset.x}, ${viewState.offset.y}) scale(${viewState.zoom})`}>
         {edges.map((edge: MindEdge) => (
