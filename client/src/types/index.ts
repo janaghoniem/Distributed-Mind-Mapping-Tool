@@ -8,6 +8,12 @@ export interface Node {
   label: string;
   position: Position;
   color: string;
+  shape: 'circle' | 'rectangle';
+  textStyle?: { 
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+  };
 }
 
 export interface Edge {

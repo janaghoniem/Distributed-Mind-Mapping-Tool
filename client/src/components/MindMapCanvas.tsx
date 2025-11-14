@@ -9,10 +9,14 @@ const MindMapCanvas: React.FC = () => {
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState<Position>({ x: 0, y: 0 });
 
-  const { nodes, edges, viewState, setViewState, removeEdge, selectNode } = useMindMapStore();
+  const { nodes, edges, viewState, setViewState, removeEdge, selectNode, setCanvasRef } = useMindMapStore();
+
+  useEffect(() => {
+    setCanvasRef(svgRef);
+  }, [setCanvasRef]);
 
   const handleMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    if (e.button === 0 || (e.button === 0 && e.ctrlKey)) {
       setIsPanning(true);
       setPanStart({ x: e.clientX - viewState.offset.x, y: e.clientY - viewState.offset.y });
       e.preventDefault();
@@ -35,23 +39,49 @@ const MindMapCanvas: React.FC = () => {
   const handleMouseUp = () => {
     setIsPanning(false);
   };
-
+  
   const handleWheel = (e: React.WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.05 : 0.05;
-    setViewState({ zoom: Math.max(0.5, Math.min(2, viewState.zoom + delta)) });
+    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1; 
+    const newZoom = Math.max(0.5, Math.min(2, viewState.zoom * zoomFactor));
+
+    const rect = svgRef.current!.getBoundingClientRect();
+    const clientX = e.clientX - rect.left;
+    const clientY = e.clientY - rect.top;
+
+    const oldOffset = viewState.offset;
+    const oldZoom = viewState.zoom;
+
+    const centerX = (clientX - oldOffset.x) / oldZoom;
+    const centerY = (clientY - oldOffset.y) / oldZoom;
+
+    const newOffsetX = clientX - centerX * newZoom;
+    const newOffsetY = clientY - centerY * newZoom;
+
+    setViewState({
+      zoom: newZoom,
+      offset: { x: newOffsetX, y: newOffsetY }
+    });
   };
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        if (e.key === 'z') {
-          e.preventDefault();
-          useMindMapStore.getState().undo();
-        } else if (e.key === 'y') {
-          e.preventDefault();
-          useMindMapStore.getState().redo();
-        }
+      // FIX for 'N' key bug: Check if an input field is focused (e.g., node label or map name)
+      const activeElement = document.activeElement;
+      const isInputFocused = activeElement?.tagName === 'INPUT' || activeElement?.tagName === 'TEXTAREA';
+
+      // Ignore shortcuts if an input is focused
+      if (isInputFocused) {
+          return;
+      }
+      // END FIX
+
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        useMindMapStore.getState().undo();
+      } else if (e.key === 'y' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        useMindMapStore.getState().redo();
       } else if (e.key === 'n') {
         useMindMapStore.getState().addNode();
       } else if (e.key === 'c') {
@@ -66,10 +96,12 @@ const MindMapCanvas: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  const cursorClass = isPanning ? 'cursor-grabbing' : 'cursor-grab';
+
   return (
     <svg
       ref={svgRef}
-      className="w-full h-full bg-gray-50"
+      className={`w-full h-full bg-gray-50 ${cursorClass}`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -90,12 +122,14 @@ const MindMapCanvas: React.FC = () => {
           <polygon points="0 0, 10 3, 0 6" fill="#94A3B8" />
         </marker>
 
-        {/* --- ADDED GRID PATTERN DEFINITION --- */}
+        {/* FIX for Zoom/Grid: Apply the viewState's transform to the pattern so it scales with the canvas */}
+        {/* Apply patternTransform to the pattern so it scales with the canvas */}
         <pattern
           id="smallGrid"
           width="10"
           height="10"
           patternUnits="userSpaceOnUse"
+          patternTransform={`translate(${viewState.offset.x}, ${viewState.offset.y}) scale(${viewState.zoom})`}
         >
           <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#E5E7EB" strokeWidth="0.5" />
         </pattern>
@@ -104,23 +138,30 @@ const MindMapCanvas: React.FC = () => {
           width="100"
           height="100"
           patternUnits="userSpaceOnUse"
+          patternTransform={`translate(${viewState.offset.x}, ${viewState.offset.y}) scale(${viewState.zoom})`}
         >
           <rect width="100" height="100" fill="url(#smallGrid)" />
           <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#D1D5DB" strokeWidth="1" />
         </pattern>
-        {/* ------------------------------------- */}
       </defs>
 
-      {/* --- ADDED GRID RECTANGLE --- */}
-      <rect width="100%" height="100%" fill="url(#grid)" />
-      {/* ---------------------------- */}
+      {/* The grid background is now purely a large, static element centered at the origin (0,0). 
+          Its internal pattern moves and scales via the patternTransform above.
+      */}
+      <rect 
+        x="-25000" // Set to a large negative number
+        y="-25000" // Set to a large negative number
+        width="50000" // Very large size
+        height="50000" // Very large size
+        fill="url(#grid)" 
+      />
 
+      {/* Main transform group for nodes and edges (this already handles node zoom) */}
       <g transform={`translate(${viewState.offset.x}, ${viewState.offset.y}) scale(${viewState.zoom})`}>
-        {edges.map((edge: MindEdge) => (
+        {edges.map(edge => (
           <Edge key={edge.id} edge={edge} nodes={nodes} onRemove={removeEdge} />
         ))}
-
-        {nodes.map((node: MindNode) => (
+        {nodes.map(node => (
           <Node key={node.id} node={node} />
         ))}
       </g>

@@ -13,9 +13,11 @@ interface MindMapStore {
   historyIndex: number;
   viewState: ViewState;
   cursors: Map<string, Cursor>;
-  
+  mapName: string;
+  canvasRef: React.RefObject<SVGSVGElement> | null;  
+
   // Node actions
-  addNode: (position?: Position) => void;
+  addNode: (position?: Position, shape?: Node['shape']) => void;
   removeNode: (id: string) => void;
   updateNode: (id: string, updates: Partial<Node>) => void;
   moveNode: (id: string, position: Position) => void;
@@ -41,6 +43,10 @@ interface MindMapStore {
   // Collaboration
   updateCursor: (userId: string, cursor: Cursor) => void;
   removeCursor: (userId: string) => void;
+
+  // Map actions
+  setMapName: (name: string) => void; 
+  setCanvasRef: (ref: React.RefObject<SVGSVGElement | null>) => void;
   
   // Layout
   autoLayoutNodes: () => void;
@@ -56,7 +62,9 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
       id: '1', 
       label: 'Central Idea', 
       position: { x: 400, y: 300 }, 
-      color: '#3B82F6' 
+      color: '#3B82F6',
+      shape: 'circle',
+      textStyle: { bold: false, italic: false, underline: false },
     }
   ],
   edges: [],
@@ -67,24 +75,31 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
   historyIndex: -1,
   viewState: { zoom: 1, offset: { x: 0, y: 0 } },
   cursors: new Map(),
+  mapName: 'Untitled', // NEW: Default map name
+  canvasRef: null, // NEW: Initial canvas ref
 
   // Node actions
-  addNode: (position) => {
-    const state = get();
+  addNode: (position, shape = 'circle') => { 
+    // Calculate position relative to viewport center and current zoom/offset
+    const { viewState } = get();
+    const centerX = (window.innerWidth / 2 - viewState.offset.x) / viewState.zoom;
+    const centerY = (window.innerHeight / 2 - viewState.offset.y) / viewState.zoom;
+    
     const newNode: Node = {
       id: generateId(),
       label: 'New Node',
-      position: position || { 
-        x: 400 - state.viewState.offset.x / state.viewState.zoom, 
-        y: 300 - state.viewState.offset.y / state.viewState.zoom 
-      },
-      color: getRandomColor()
+      position: position || { x: centerX, y: centerY },
+      color: getRandomColor(),
+      shape: shape, // Use provided shape
     };
-    
-    set({ nodes: [...state.nodes, newNode] });
+
+    set(state => ({
+      nodes: [...state.nodes, newNode],
+      selectedNodeId: newNode.id,
+    }));
     get().saveToHistory();
   },
-
+  
   removeNode: (id) => {
     const state = get();
     set({
@@ -168,6 +183,11 @@ export const useMindMapStore = create<MindMapStore>((set, get) => ({
     set({ connectSourceId: id });
   },
 
+  
+  // NEW Map/Canvas actions
+  setMapName: (mapName: string) => set({ mapName }), // NEW
+  setCanvasRef: (ref) => set({ canvasRef: ref as React.RefObject<SVGSVGElement> | null }),
+  
   // History management
   undo: () => {
     const { history, historyIndex } = get();

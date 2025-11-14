@@ -15,8 +15,8 @@ const App: React.FC = () => {
       <MindMapCanvas />
       <StatusBar />
       
-      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-4 max-w-xs">
-        <h2 className="text-lg font-bold mb-2">Shortcuts</h2>
+      <div className="absolute top-4 right-4 bg-white rounded-lg shadow-lg p-5 max-w-xs">
+        <h2 className="text-lg font-semibold mb-2">Shortcuts</h2>
         <div className="text-sm text-gray-600 space-y-1">
           <p><kbd className="px-1 bg-gray-100 rounded">N</kbd> Add node</p>
           <p><kbd className="px-1 bg-gray-100 rounded">C</kbd> Connect mode</p>
@@ -25,6 +25,7 @@ const App: React.FC = () => {
           <p><kbd className="px-1 bg-gray-100 rounded">Ctrl+Z/Y</kbd> Undo/Redo</p>
           <p><kbd className="px-1 bg-gray-100 rounded">Double-click</kbd> Edit node</p>
           <p><kbd className="px-1 bg-gray-100 rounded">Scroll</kbd> Zoom</p>
+          <p><kbd className="px-1 bg-gray-100 rounded">Ctrl+Click</kbd> Pan across canvas</p>
         </div>
       </div>
     </div>

@@ -1,7 +1,7 @@
 import React from 'react';
 
 // IMPORTANT: Replace './path/to/your/logo.png' with the actual path to your logo file
-import LogoImage from '../../public/synapse-logo.png'; 
+import LogoImage from '/synapse-logo.png'; 
 
 // Define the custom SVG Title component
 const CustomTitle: React.FC = () => (
