@@ -96,11 +96,16 @@ const Node: React.FC<{ node: MindNode }> = ({ node }) => {
 
   const handleMouseDown = (e: React.MouseEvent) => {
     if (isEditing) return;
+    if (e.detail >= 2) {
+      return;
+    }    
     if (e.button === 1 || e.button === 2) return; 
     
     if (!connectMode) {
       e.preventDefault(); 
     }
+
+    console.log("Mouse down detected on node");
 
     e.stopPropagation();
     selectNode(node.id);
@@ -136,8 +141,11 @@ const Node: React.FC<{ node: MindNode }> = ({ node }) => {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleDoubleClick = () => {
-    setIsEditing(true);
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    console.log("Double click detected on node");
+    e.preventDefault(); 
+    e.stopPropagation(); 
+    setIsEditing(true); // Sets the state to start editing
   };
 
   const handleBlur = () => {
@@ -210,17 +218,17 @@ const Node: React.FC<{ node: MindNode }> = ({ node }) => {
   };
 
   return (
-    <g
-      transform={`translate(${node.position.x}, ${node.position.y})`}
-      onMouseDown={handleMouseDown}
-      onDoubleClick={handleDoubleClick}
-      onContextMenu={handleContextMenu}
-      onKeyDown={handleNodeKeyDown}
-      className="cursor-move"
-      role="button"
-      aria-label={`Node: ${node.label}`}
-      tabIndex={0}
-    >
+      <g
+        transform={`translate(${node.position.x}, ${node.position.y})`}
+        onMouseDown={handleMouseDown}
+        onDoubleClick={handleDoubleClick}
+        onContextMenu={handleContextMenu}
+        onKeyDown={handleNodeKeyDown}
+        className="cursor-move"
+        role="button"
+        aria-label={`Node: ${node.label}`}
+        tabIndex={0}
+      >
       
       <NodeVisual />
 
