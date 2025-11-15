@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const serverConfig = require('../config/server');
+const logger = require('../utils/logger');
 
 class HealthMonitor {
     constructor() {
@@ -7,17 +8,19 @@ class HealthMonitor {
         this.failureCount = 0;
         this.config = serverConfig.healthCheck;
         this.isPrimary = true; // This server starts as primary
-        this.maxFailures = 10; // Stop retrying after this many failures
+        this.maxFailures = 2; // Stop retrying after this many failures
         this.lastCheckTime = 0;
         this.minCheckIntervalMs = 1000; // Prevent too-frequent checks
+        this.monitoringInterval = null; // Track the interval so we can stop it
+        this.failoverTriggered = false; // Prevent duplicate failover messages
 
         // Listen to mongoose connection lifecycle to log and react immediately
         mongoose.connection.on('connected', () => {
-            console.log('MongoDB connected (event)');
+            logger.info('MongoDB connected (event)');
             this.failureCount = 0; // Reset on successful connect
             if (!this.isHealthy) {
                 this.isHealthy = true;
-                console.log('Service recovered (via event)');
+                logger.info('Service recovered (via event)');
             }
         });
 
@@ -28,7 +31,7 @@ class HealthMonitor {
         mongoose.connection.on('error', (err) => {
             // Classify auth vs network errors for clearer logs
             const msg = (err && err.message) ? err.message : String(err);
-            console.warn(`MongoDB connection error (event): ${msg}`);
+            logger.warn(`MongoDB connection error (event): ${msg}`);
             if (/auth|authentication/i.test(msg)) {
                 // Authentication errors are immediate but still recorded so admin can act
                 this.recordFailure(`Authentication error: ${msg}`, { authError: true });
@@ -39,14 +42,22 @@ class HealthMonitor {
     }
 
     startMonitoring() {
-        // Run initial check immediately so we get logs even if DB wasn't ready at startup
-        this.checkHealth();
+        // Delay initial check to allow DB connection to establish
+        // Prevents false "Database not connected" warning at startup
+        setTimeout(() => {
+            this.checkHealth();
+        }, 2000);
 
-        setInterval(() => {
+        this.monitoringInterval = setInterval(() => {
+            // Stop checking if failover already triggered
+            if (this.failoverTriggered) {
+                clearInterval(this.monitoringInterval);
+                return;
+            }
             this.checkHealth();
         }, this.config.interval);
 
-        console.log('Health monitoring active');
+        logger.info('Health monitoring active');
     }
 
     async checkHealth() {
@@ -70,7 +81,7 @@ class HealthMonitor {
             // Reset on success
             this.failureCount = 0;
             if (!this.isHealthy) {
-                console.log('Service recovered');
+                logger.info('Service recovered');
                 this.isHealthy = true;
             }
         } catch (error) {
@@ -83,20 +94,27 @@ class HealthMonitor {
     recordFailure(reason, meta = {}) {
         // If auth error and admin mistake, mark but avoid aggressive failover until threshold
         const isAuth = !!meta.authError || /auth|authentication/i.test(reason);
+
+        // Don't count more failures after failover triggered
+        if (this.failoverTriggered) {
+            return;
+        }
+
         this.failureCount++;
 
-        console.warn(`Health check failed (${this.failureCount}/${this.config.unhealthyThreshold}): ${reason}`);
+        logger.warn(`Health check failed (${this.failureCount}/${this.config.unhealthyThreshold}): ${reason}`);
 
         // Log extra hint for authentication problems
         if (isAuth) {
-            console.warn('Hint: Authentication failed. Check MONGODB_URI credentials and IP whitelist.');
+            logger.warn('Hint: Authentication failed. Check MONGODB_URI credentials and IP whitelist.');
         }
 
         // Stop retrying if we've exceeded max failures
         if (this.failureCount >= this.maxFailures) {
             if (this.isHealthy) {
                 this.isHealthy = false;
-                console.error('SERVICE UNHEALTHY - Max retries exceeded. Triggering failover simulation');
+                logger.error('SERVICE UNHEALTHY - Max retries exceeded. Triggering failover simulation');
+                this.failoverTriggered = true;
                 this.simulateFailover();
             }
             return;
@@ -109,9 +127,10 @@ class HealthMonitor {
     }
 
     triggerFailover() {
-        if (this.isHealthy) {
+        if (this.isHealthy && !this.failoverTriggered) {
             this.isHealthy = false;
-            console.error('SERVICE UNHEALTHY - Triggering failover simulation');
+            this.failoverTriggered = true;
+            logger.error('SERVICE UNHEALTHY - Triggering failover simulation');
 
             // Simulate failover logic
             this.simulateFailover();
@@ -119,17 +138,17 @@ class HealthMonitor {
     }
 
     simulateFailover() {
-        console.log('Failover Simulation Started:');
-        console.log('   1. Marking primary as unhealthy');
-        console.log('   2. [SIMULATION] Promoting standby server to primary');
-        console.log('   3. [SIMULATION] Updating load balancer configuration');
-        console.log('   4. [SIMULATION] Notifying clients to reconnect');
-        console.log('   5. [SIMULATION] Redirecting traffic to new primary');
+        logger.info('Failover Simulation Started:');
+        logger.info('   1. Marking primary as unhealthy');
+        logger.info('   2. [SIMULATION] Promoting standby server to primary');
+        logger.info('   3. [SIMULATION] Updating load balancer configuration');
+        logger.info('   4. [SIMULATION] Notifying clients to reconnect');
+        logger.info('   5. [SIMULATION] Redirecting traffic to new primary');
 
         this.isPrimary = false;
 
         setTimeout(() => {
-            console.log('Failover simulation complete - standby is now primary');
+            logger.info('Failover simulation complete - standby is now primary');
         }, 2000);
     }
 
