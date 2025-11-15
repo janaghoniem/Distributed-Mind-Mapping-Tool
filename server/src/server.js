@@ -45,23 +45,23 @@ io.on('connection', (socket) => {
 const healthMonitor = new HealthMonitor();
 healthMonitor.startMonitoring();
 
-// Start DB connection but do not crash app on failure
-// Use connectWithRetry so healthMonitor can observe and log failures
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mindmap_db';
-connectWithRetry(MONGODB_URI);
+// Disabled for now: connectWithRetry keeps retrying forever
+// Use blocking connectDatabase() instead - on failure, nodemon restarts on file change
+// const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/mindmap_db';
+// connectWithRetry(MONGODB_URI);
 
 const PORT = process.env.PORT || 3000;
 
 async function startServer() {
     try {
-        // Connect to database
+        // Connect to database (blocking - throws on failure)
+        // On auth error: fix .env and save → nodemon restarts → tries again
         await connectDatabase();
         console.log('Database connected');
 
         // Start server
         server.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
-            //   console.log(`Architecture & Infrastructure ready`);
         });
     } catch (error) {
         console.error('Failed to start server:', error);
