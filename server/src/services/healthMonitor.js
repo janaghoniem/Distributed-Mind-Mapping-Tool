@@ -1,5 +1,5 @@
 const mongoose = require('mongoose');
-const serverConfig = require('../config/server');
+const serverConfig = require('../config/serverConfig');
 const logger = require('../utils/logger');
 
 class HealthMonitor {

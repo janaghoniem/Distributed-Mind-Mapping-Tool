@@ -2,6 +2,8 @@ const mongoose = require('mongoose');
 const logger = require('../utils/logger');
 const DEFAULT_RETRY_MS = 5000;
 
+
+
 async function connectDatabase() {
     const uri = process.env.MONGODB_URI;
 

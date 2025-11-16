@@ -1,14 +1,24 @@
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
-require('dotenv').config();
+
 
 const { connectDatabase, connectWithRetry } = require('./config/database');
 const HealthMonitor = require('./services/healthMonitor');
 
+
+const mapRoutes = require('./routes/mapRoutes');
+//const operationRoutes = require('./routes/operationRoutes');
+const healthRoutes = require('./routes/healthRoutes');
 const app = express();
 const server = http.createServer(app);
+
+
+//websocket
+//const setupWebSocket = require('./websocket/socketHandler');
+const { setupWebSocket } = require('./websocket/socketHandler');
 
 // Middleware
 app.use(cors());
@@ -30,6 +40,7 @@ const io = new Server(server, {
         credentials: true
     }
 });
+setupWebSocket(io);
 
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
