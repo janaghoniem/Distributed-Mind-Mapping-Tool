@@ -1,3 +1,4 @@
+// client/src/components/Edge.tsx
 import React from 'react';
 import type { Edge as EdgeType, Node } from '../types';
 

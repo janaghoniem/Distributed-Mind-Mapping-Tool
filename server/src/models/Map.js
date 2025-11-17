@@ -47,7 +47,7 @@ const MapSchema = new mongoose.Schema({
   // Owner information
   ownerId: {
     type: String,
-    required: true
+    default: 'system' 
   },
   
   // Vector clock for causality tracking

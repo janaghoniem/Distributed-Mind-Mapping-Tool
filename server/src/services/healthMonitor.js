@@ -1,7 +1,40 @@
 const mongoose = require('mongoose');
 const serverConfig = require('../config/serverConfig');
 const logger = require('../utils/logger');
+const GraphValidator = require('./graphValidator');
+const Map = require('../models/Map');
 
+
+async function checkGraphHealth() {
+  try {
+    const maps = await Map.find({ isDeleted: false }).limit(10);
+    
+    for (const map of maps) {
+      const validation = await GraphValidator.validateGraph(map.mapId);
+      
+      if (!validation.valid) {
+        logger.warn(`Graph health check failed for map ${map.mapId}:`, {
+          errors: validation.errors,
+          warnings: validation.warnings
+        });
+        
+        // Auto-fix if possible
+        if (validation.fixes.length > 0) {
+          const fixResult = await GraphValidator.applyFixes(
+            map.mapId, 
+            validation.fixes
+          );
+          logger.info(`Applied ${fixResult.applied} fixes to map ${map.mapId}`);
+        }
+      }
+    }
+  } catch (error) {
+    logger.error('Graph health check error:', error);
+  }
+}
+
+// Call this periodically (e.g., every 5 minutes)
+setInterval(checkGraphHealth, 5 * 60 * 1000);
 class HealthMonitor {
     constructor() {
         this.isHealthy = true;
@@ -161,6 +194,7 @@ class HealthMonitor {
             timestamp: new Date()
         };
     }
+    
 }
 
 module.exports = HealthMonitor;

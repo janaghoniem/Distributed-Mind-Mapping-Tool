@@ -1,3 +1,4 @@
+// client/src/components/Node.tsx
 import React, { useRef, useState, useMemo, useEffect } from 'react';
 import { useMindMapStore } from '../store/useMindMapStore';
 import type { Node as MindNode } from '../types';
@@ -65,6 +66,20 @@ const Node: React.FC<{ node: MindNode }> = ({ node }) => {
     window.addEventListener('click', handleGlobalClick);
     return () => window.removeEventListener('click', handleGlobalClick);
   }, [handleGlobalClick]);
+  // Auto-focus and select text when editing starts
+// In Node.tsx, replace the useEffect for editing with this version:
+
+useEffect(() => {
+  if (isEditing && inputRef.current) {
+    // Use requestAnimationFrame for better timing
+    requestAnimationFrame(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select();
+      }
+    });
+  }
+}, [isEditing]);
 
   const handleDelete = () => {
     removeNode(node.id);
@@ -141,12 +156,13 @@ const Node: React.FC<{ node: MindNode }> = ({ node }) => {
     window.addEventListener('mouseup', handleMouseUp);
   };
 
-  const handleDoubleClick = (e: React.MouseEvent) => {
-    console.log("Double click detected on node");
-    e.preventDefault(); 
-    e.stopPropagation(); 
-    setIsEditing(true); // Sets the state to start editing
-  };
+const handleDoubleClick = (e: React.MouseEvent) => {
+  console.log("Double click detected on node");
+  e.preventDefault(); 
+  e.stopPropagation(); 
+  setIsEditing(true);
+};
+
 
   const handleBlur = () => {
     if (label.trim() !== node.label) {

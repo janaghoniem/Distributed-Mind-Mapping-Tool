@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useMindMapStore } from '../store/useMindMapStore';
-import type { WebSocketMessage, Node, Edge } from '../types';
+import type { Node, Edge } from '../types';
 
 interface UseWebSocketOptions {
   url: string;
   userId: string;
+  mapId?: string;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
 }
 
-export const useWebSocket = ({ url, userId, onConnect, onDisconnect, onError }: UseWebSocketOptions) => {
+export const useWebSocket = ({ url, userId, mapId, onConnect, onDisconnect, onError }: UseWebSocketOptions) => {
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectAttempts, setReconnectAttempts] = useState(0);
   const socketRef = useRef<Socket | null>(null);
@@ -31,17 +32,22 @@ export const useWebSocket = ({ url, userId, onConnect, onDisconnect, onError }: 
 
     // Connection handlers
     socket.on('connect', () => {
-      console.log('WebSocket connected');
+      console.log('✅ WebSocket connected');
       setIsConnected(true);
       setReconnectAttempts(0);
       onConnect?.();
       
+      // Join map if mapId provided
+      if (mapId) {
+        socket.emit('join-map', { mapId });
+      }
+      
       // Request initial sync
-      socket.emit('sync:request');
+      socket.emit('sync:request', { mapId });
     });
 
     socket.on('disconnect', () => {
-      console.log('WebSocket disconnected');
+      console.log('❌ WebSocket disconnected');
       setIsConnected(false);
       onDisconnect?.();
     });
@@ -52,51 +58,67 @@ export const useWebSocket = ({ url, userId, onConnect, onDisconnect, onError }: 
       onError?.(error);
     });
 
-    // Sync handler
+    // Sync handler - Load initial data from server
     socket.on('sync:response', (data: { nodes: Node[], edges: Edge[] }) => {
-      console.log('Received sync data:', data);
-      store.syncState(data.nodes, data.edges);
+      console.log('📥 SYNC: Received', data.nodes?.length || 0, 'nodes and', data.edges?.length || 0, 'edges');
+      store.syncState(data.nodes || [], data.edges || []);
     });
 
-    // Node operations
+    // ========== REMOTE NODE OPERATIONS ==========
+    
     socket.on('node:add', (data: { node: Node, userId: string }) => {
       if (data.userId !== userId) {
-        store.addNode(data.node.position);
+        console.log('📥 REMOTE: node:add', data.node.id, data.node.label);
+        store.addNodeRemote(data.node);
       }
     });
 
     socket.on('node:remove', (data: { nodeId: string, userId: string }) => {
       if (data.userId !== userId) {
-        store.removeNode(data.nodeId);
+        console.log('📥 REMOTE: node:remove', data.nodeId);
+        store.removeNodeRemote(data.nodeId);
       }
     });
 
     socket.on('node:update', (data: { nodeId: string, updates: Partial<Node>, userId: string }) => {
       if (data.userId !== userId) {
-        store.updateNode(data.nodeId, data.updates);
+        console.log('📥 REMOTE: node:update', data.nodeId);
+        store.updateNodeRemote(data.nodeId, data.updates);
       }
     });
 
     socket.on('node:move', (data: { nodeId: string, position: { x: number, y: number }, userId: string }) => {
       if (data.userId !== userId) {
-        store.moveNode(data.nodeId, data.position);
+        store.moveNodeRemote(data.nodeId, data.position);
       }
     });
 
-    // Edge operations
-    socket.on('edge:add', (data: { source: string, target: string, userId: string }) => {
+    // ========== REMOTE EDGE OPERATIONS ==========
+    
+    socket.on('edge:add', (data: { edge?: Edge, source: string, target: string, userId: string }) => {
       if (data.userId !== userId) {
-        store.addEdge(data.source, data.target);
+        console.log('📥 REMOTE: edge:add', `${data.source} -> ${data.target}`);
+        
+        // Create edge with remote data
+        const edge: Edge = data.edge || {
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          source: data.source,
+          target: data.target
+        };
+        
+        store.addEdgeRemote(edge);
       }
     });
 
     socket.on('edge:remove', (data: { edgeId: string, userId: string }) => {
       if (data.userId !== userId) {
-        store.removeEdge(data.edgeId);
+        console.log('📥 REMOTE: edge:remove', data.edgeId);
+        store.removeEdgeRemote(data.edgeId);
       }
     });
 
-    // Cursor updates
+    // ========== CURSOR UPDATES ==========
+    
     socket.on('cursor:update', (data: { userId: string, position: { x: number, y: number }, color: string }) => {
       if (data.userId !== userId) {
         store.updateCursor(data.userId, {
@@ -108,6 +130,7 @@ export const useWebSocket = ({ url, userId, onConnect, onDisconnect, onError }: 
     });
 
     socket.on('user:left', (data: { userId: string }) => {
+      console.log('👋 User left:', data.userId);
       store.removeCursor(data.userId);
     });
 
@@ -116,24 +139,29 @@ export const useWebSocket = ({ url, userId, onConnect, onDisconnect, onError }: 
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [url, userId]);
+  }, [url, userId, mapId]);
 
   // Emit functions
   const emit = (event: string, data: any) => {
     if (socketRef.current?.connected) {
       socketRef.current.emit(event, { ...data, userId });
+    } else {
+      console.warn('⚠️ Socket not connected, cannot emit:', event);
     }
   };
 
   const emitNodeAdd = (node: Node) => {
+    console.log('📤 EMIT: node:add', node.id);
     emit('node:add', { node });
   };
 
   const emitNodeRemove = (nodeId: string) => {
+    console.log('📤 EMIT: node:remove', nodeId);
     emit('node:remove', { nodeId });
   };
 
   const emitNodeUpdate = (nodeId: string, updates: Partial<Node>) => {
+    console.log('📤 EMIT: node:update', nodeId);
     emit('node:update', { nodeId, updates });
   };
 
@@ -142,16 +170,33 @@ export const useWebSocket = ({ url, userId, onConnect, onDisconnect, onError }: 
   };
 
   const emitEdgeAdd = (source: string, target: string) => {
+    console.log('📤 EMIT: edge:add', `${source} -> ${target}`);
     emit('edge:add', { source, target });
   };
 
   const emitEdgeRemove = (edgeId: string) => {
+    console.log('📤 EMIT: edge:remove', edgeId);
     emit('edge:remove', { edgeId });
   };
 
   const emitCursorUpdate = (position: { x: number, y: number }, color: string) => {
     emit('cursor:update', { position, color });
   };
+
+  // Connect emit functions to store on mount
+  useEffect(() => {
+    if (isConnected) {
+      console.log('🔗 Connecting emit functions to store');
+      store.setEmitFunctions({
+        emitNodeAdd,
+        emitNodeRemove,
+        emitNodeUpdate,
+        emitNodeMove,
+        emitEdgeAdd,
+        emitEdgeRemove,
+      });
+    }
+  }, [isConnected]);
 
   return {
     isConnected,

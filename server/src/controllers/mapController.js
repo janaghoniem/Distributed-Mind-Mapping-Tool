@@ -1,196 +1,199 @@
 // server/src/controllers/mapController.js
-// REST API endpoints for map CRUD operations
-
 const Map = require('../models/Map');
-//const Node = require('../models/Node');
-//const Edge = require('../models/Edge');
-//const Operation = require('../models/Operation');
+const Node = require('../models/Node');
+const Edge = require('../models/Edge');
+const { v4: uuidv4 } = require('uuid');
 const logger = require('../utils/logger');
-//const { generateId } = require('../utils/helpers');
 
-// Create a new map
-exports.createMap = async (req, res, next) => {
-  try {
-    const { title, description, ownerId } = req.body;
-    
-    const mapId = generateId('map');
-    
-    const map = new Map({
-      mapId,
-      title: title || 'Untitled Map',
-      description: description || '',
-      ownerId: ownerId || 'anonymous',
-      vectorClock: new Map(),
-      version: 0
-    });
-    
-    await map.save();
-    
-    logger.info(`Map created: ${mapId}`);
-    
-    res.status(201).json({
-      success: true,
-      data: map
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Get map by ID with all nodes and edges
-exports.getMap = async (req, res, next) => {
-  try {
-    const { mapId } = req.params;
-    
-    const map = await Map.findOne({ mapId, isDeleted: false });
-    
-    if (!map) {
-      return res.status(404).json({
+class MapController {
+  
+  // Create new map
+  static async createMap(req, res) {
+    try {
+      const { name, description } = req.body;
+      
+      const newMap = new Map({
+        mapId: `map_${uuidv4()}`,
+        name: name || 'Untitled Map',
+        description: description || '',
+        createdAt: new Date(),
+        updatedAt: new Date()
+      });
+      
+      await newMap.save();
+      
+      logger.info(`✅ Map created: ${newMap.mapId}`);
+      
+      res.status(201).json({
+        success: true,
+        map: newMap
+      });
+    } catch (error) {
+      logger.error('Create map error:', error);
+      res.status(500).json({
         success: false,
-        message: 'Map not found'
+        error: error.message
       });
     }
-    
-    // Get all nodes and edges
-    const nodes = await Node.find({ mapId, isDeleted: false });
-    const edges = await Edge.find({ mapId, isDeleted: false });
-    
-    res.json({
-      success: true,
-      data: {
+  }
+  
+  // Get all maps
+  static async getMaps(req, res) {
+    try {
+      const { limit = 50, skip = 0 } = req.query;
+      
+      const maps = await Map.find({ isDeleted: false })
+        .sort({ updatedAt: -1 })
+        .limit(parseInt(limit))
+        .skip(parseInt(skip));
+      
+      const total = await Map.countDocuments({ isDeleted: false });
+      
+      res.json({
+        success: true,
+        total,
+        count: maps.length,
+        maps
+      });
+    } catch (error) {
+      logger.error('Get maps error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+  
+  // Get single map with nodes and edges
+  static async getMap(req, res) {
+    try {
+      const { mapId } = req.params;
+      
+      const map = await Map.findOne({ mapId, isDeleted: false });
+      if (!map) {
+        return res.status(404).json({
+          success: false,
+          error: 'Map not found'
+        });
+      }
+      
+      const nodes = await Node.find({ mapId, isDeleted: false });
+      const edges = await Edge.find({ mapId, isDeleted: false });
+      
+      res.json({
+        success: true,
         map,
         nodes,
         edges
+      });
+    } catch (error) {
+      logger.error('Get map error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
+  }
+  
+  // Update map
+  static async updateMap(req, res) {
+    try {
+      const { mapId } = req.params;
+      const { name, description, settings } = req.body;
+      
+      const updates = {};
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (settings !== undefined) updates.settings = settings;
+      updates.updatedAt = new Date();
+      
+      const map = await Map.findOneAndUpdate(
+        { mapId, isDeleted: false },
+        { $set: updates },
+        { new: true }
+      );
+      
+      if (!map) {
+        return res.status(404).json({
+          success: false,
+          error: 'Map not found'
+        });
       }
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Get all maps for a user
-exports.getMaps = async (req, res, next) => {
-  try {
-    const { ownerId } = req.query;
-    
-    const query = { isDeleted: false };
-    if (ownerId) {
-      query.ownerId = ownerId;
-    }
-    
-    const maps = await Map.find(query)
-      .sort({ updatedAt: -1 })
-      .select('-vectorClock');
-    
-    res.json({
-      success: true,
-      data: maps
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// Update map metadata
-exports.updateMap = async (req, res, next) => {
-  try {
-    const { mapId } = req.params;
-    const { title, description } = req.body;
-    
-    const map = await Map.findOne({ mapId, isDeleted: false });
-    
-    if (!map) {
-      return res.status(404).json({
+      
+      logger.info(`✅ Map updated: ${mapId}`);
+      
+      res.json({
+        success: true,
+        map
+      });
+    } catch (error) {
+      logger.error('Update map error:', error);
+      res.status(500).json({
         success: false,
-        message: 'Map not found'
+        error: error.message
       });
     }
-    
-    if (title) map.title = title;
-    if (description !== undefined) map.description = description;
-    
-    map.version += 1;
-    map.updatedAt = new Date();
-    
-    await map.save();
-    
-    logger.info(`Map updated: ${mapId}`);
-    
-    res.json({
-      success: true,
-      data: map
-    });
-  } catch (error) {
-    next(error);
   }
-};
-
-// Delete map (soft delete)
-exports.deleteMap = async (req, res, next) => {
-  try {
-    const { mapId } = req.params;
-    
-    const map = await Map.findOne({ mapId });
-    
-    if (!map) {
-      return res.status(404).json({
+  
+  // Delete map
+  static async deleteMap(req, res) {
+    try {
+      const { mapId } = req.params;
+      
+      await Map.updateOne({ mapId }, { $set: { isDeleted: true, updatedAt: new Date() } });
+      await Node.updateMany({ mapId }, { $set: { isDeleted: true, updatedAt: new Date() } });
+      await Edge.updateMany({ mapId }, { $set: { isDeleted: true, updatedAt: new Date() } });
+      
+      logger.info(`✅ Map deleted: ${mapId}`);
+      
+      res.json({
+        success: true,
+        message: 'Map deleted successfully'
+      });
+    } catch (error) {
+      logger.error('Delete map error:', error);
+      res.status(500).json({
         success: false,
-        message: 'Map not found'
+        error: error.message
       });
     }
-    
-    // Soft delete map, nodes, and edges
-    map.isDeleted = true;
-    await map.save();
-    
-    await Node.updateMany({ mapId }, { isDeleted: true });
-    await Edge.updateMany({ mapId }, { isDeleted: true });
-    
-    logger.info(`Map deleted: ${mapId}`);
-    
-    res.json({
-      success: true,
-      message: 'Map deleted successfully'
-    });
-  } catch (error) {
-    next(error);
   }
-};
-
-// Get map statistics
-exports.getMapStats = async (req, res, next) => {
-  try {
-    const { mapId } = req.params;
-    
-    const map = await Map.findOne({ mapId, isDeleted: false });
-    
-    if (!map) {
-      return res.status(404).json({
-        success: false,
-        message: 'Map not found'
-      });
-    }
-    
-    const nodeCount = await Node.countDocuments({ mapId, isDeleted: false });
-    const edgeCount = await Edge.countDocuments({ mapId, isDeleted: false });
-    const operationCount = await Operation.countDocuments({ mapId });
-    
-    res.json({
-      success: true,
-      data: {
-        mapId,
-        nodeCount,
-        edgeCount,
-        operationCount,
-        version: map.version,
-        activeSessions: map.activeSessions.length,
-        createdAt: map.createdAt,
-        updatedAt: map.updatedAt
+  
+  // Get map statistics
+  static async getMapStats(req, res) {
+    try {
+      const { mapId } = req.params;
+      
+      const map = await Map.findOne({ mapId, isDeleted: false });
+      if (!map) {
+        return res.status(404).json({
+          success: false,
+          error: 'Map not found'
+        });
       }
-    });
-  } catch (error) {
-    next(error);
+      
+      const nodeCount = await Node.countDocuments({ mapId, isDeleted: false });
+      const edgeCount = await Edge.countDocuments({ mapId, isDeleted: false });
+      
+      res.json({
+        success: true,
+        stats: {
+          mapId,
+          name: map.name,
+          nodeCount,
+          edgeCount,
+          createdAt: map.createdAt,
+          updatedAt: map.updatedAt
+        }
+      });
+    } catch (error) {
+      logger.error('Get map stats error:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message
+      });
+    }
   }
-};
+}
 
-module.exports = exports;
+module.exports = MapController;

@@ -1,3 +1,4 @@
+// client/src/components/MindMapCanvas.tsx
 import React, { useEffect, useRef, useState } from 'react';
 import { useMindMapStore } from '../store/useMindMapStore';
 import type { Position, Node as MindNode, Edge as MindEdge } from '../types';

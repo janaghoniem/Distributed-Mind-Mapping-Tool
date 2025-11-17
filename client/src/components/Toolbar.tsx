@@ -1,3 +1,4 @@
+// client/src/components/Toolbar.tsx
 import React, { useState } from 'react';
 import { useMindMapStore } from '../store/useMindMapStore';
 import CustomTitle from './CustomTitle';
@@ -39,7 +40,28 @@ const Toolbar: React.FC = () => {
   const [isShapeMenuOpen, setIsShapeMenuOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [selectedShape, setSelectedShape] = useState<'circle' | 'rectangle'>('circle');
+// In Toolbar.tsx, find the resetView button and replace its onClick:
 
+const handleResetView = () => {
+  const confirmed = window.confirm(
+    'Reset view to default position and zoom?\n\n' +
+    'Note: This only resets the camera view, not your nodes.'
+  );
+  
+  if (confirmed) {
+    resetView();
+  }
+};
+
+// Then update the button:
+<button
+  onClick={handleResetView}  // ← Change from resetView to handleResetView
+  className="p-2 hover:bg-gray-100 rounded transition-colors"
+  title="Reset View (R)"
+  aria-label="Reset view"
+>
+  <RotateCcw size={20} />
+</button>
   const canUndo = historyIndex > 0;
   const canRedo = historyIndex < history.length - 1;
 
@@ -97,7 +119,7 @@ const Toolbar: React.FC = () => {
   };
 
   return (
-    <div className="absolute top-4 left-4 bg-white rounded-lg shadow-lg p-2 flex gap-2 items-center">
+    <div className="absolute top-15 left-4 bg-white rounded-lg shadow-lg p-2 flex gap-2 items-center">
       
       {/* 1. Editable Title Field */}
       <div className="relative flex items-center h-8">
