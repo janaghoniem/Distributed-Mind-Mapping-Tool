@@ -119,7 +119,7 @@ const handleResetView = () => {
   };
 
   return (
-    <div className="absolute top-15 left-4 bg-white rounded-lg shadow-lg p-2 flex gap-2 items-center">
+    <div className="absolute top-10 left-4 bg-white rounded-lg shadow-lg p-2 flex gap-2 items-center">
       
       {/* 1. Editable Title Field */}
       <div className="relative flex items-center h-8">
